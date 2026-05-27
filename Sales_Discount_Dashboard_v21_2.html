@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales & Discount Intelligence</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
+            --bg-color: #f4f7f9;
+            --shadow: 0 8px 20px rgba(0,0,0,0.08);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background: #0f1117; color: #333; padding: 20px; }
+
+        .container { max-width: 1600px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; }
+
+        /* UPLOAD — slim data-source bar at very top */
+        .upload-section { padding: 10px 30px; background: #f1f5f9; border-bottom: 2px solid #e2e8f0; text-align: center; border-radius: 20px 20px 0 0; }
+        .upload-box { border: 2px dashed #667eea; border-radius: 10px; padding: 9px 24px; cursor: pointer; display: inline-flex; align-items: center; gap: 14px; max-width: 680px; width: 100%; transition: 0.2s; }
+        .upload-box:hover { background: #eef2ff; border-color: #764ba2; }
+        .upload-box input { display: none; }
+        #uploadLabel { font-size: 13px; color: #334155; font-weight: 700; }
+        .upload-box p { font-size: 11px; color: #94a3b8; margin-top: 0; }
+
+        /* HEADER — below upload strip */
+        .header { background: var(--primary-gradient); color: white; padding: 22px 36px; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: -50px; right: -50px; width: 220px; height: 220px; background: rgba(255,255,255,0.07); border-radius: 50%; pointer-events: none; }
+        .header::after  { content: ''; position: absolute; bottom: -70px; left: 30%; width: 300px; height: 300px; background: rgba(255,255,255,0.05); border-radius: 50%; pointer-events: none; }
+        .header-inner { display: flex; align-items: center; gap: 18px; position: relative; z-index: 1; }
+        .header-icon { font-size: 40px; line-height: 1; }
+        .header h1 { font-size: 26px; font-weight: 800; letter-spacing: 0.5px; }
+        .header-sub { font-size: 12px; opacity: 0.72; margin-top: 4px; font-weight: 500; letter-spacing: 0.3px; }
+
+        /* FILTERS — DARK THEME */
+        .filters-section { padding: 14px 24px; background: #0f172a; border-bottom: 3px solid #1e3a5f; display: none; position: sticky; top: 0; z-index: 500; box-shadow: 0 8px 30px rgba(0,0,0,0.6); }
+        .control-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 11px; border-bottom: 1px solid #1e293b; flex-wrap: wrap; gap: 10px; }
+        .control-left { display: flex; align-items: center; gap: 20px; }
+        .toggle-group { display: flex; align-items: center; gap: 10px; }
+        .toggle-label { font-size: 11px; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .filter-row { display: flex; align-items: flex-end; gap: 8px; width: 100%; flex-wrap: wrap; padding: 0 2px 4px; }
+        .filter-group { position: relative; flex: 1; min-width: 110px; max-width: 160px; }
+        .filter-label { font-weight: 700; font-size: 10px; color: #e2e8f0; text-transform: uppercase; margin-bottom: 4px; display: block; white-space: nowrap; letter-spacing: 0.8px; }
+        .filter-dropdown-btn { width: 100%; padding: 8px 8px; background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 8px; cursor: pointer; font-size: 10px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background 0.15s, border-color 0.15s; }
+        .filter-dropdown-btn:hover { background: #334155; border-color: #667eea; color: #e2e8f0; }
+        .filter-dropdown-btn::after { content: '▼'; font-size: 7px; margin-left: 3px; flex-shrink: 0; color: #667eea; }
+
+        .checkbox-list { position: absolute; top: calc(100% + 5px); left: 0; min-width: 220px; background: white; border: 1px solid #667eea; border-radius: 8px; z-index: 9999; display: none; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        .checkbox-list.active { display: flex; }
+        .filter-scroll-area { max-height: 200px; overflow-y: auto; }
+        .filter-item { display: flex; align-items: center; padding: 10px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f8f8f8; white-space: normal; }
+        .filter-item:hover { background: #f0f4ff; }
+        .filter-item input { margin-right: 10px; accent-color: #667eea; }
+        .select-all-item { font-weight: bold; position: sticky; top: 0; background: white; z-index: 1; border-bottom: 2px solid #eee; }
+        .filter-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 10px; background: #f8fafc; border-top: 1px solid #eee; }
+        .filter-btn { padding: 5px 12px; font-size: 10px; font-weight: 700; border-radius: 4px; cursor: pointer; border: 1px solid #ddd; }
+        .filter-btn.ok { background: #667eea; color: white; border-color: #667eea; }
+
+        /* TOGGLE */
+        .toggle-switch { width: 38px; height: 20px; background: #334155; border-radius: 20px; position: relative; cursor: pointer; transition: 0.3s; border: 1px solid #475569; }
+        .toggle-switch.active { background: #667eea; border-color: #667eea; }
+        .toggle-slider { width: 14px; height: 14px; background: #94a3b8; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+        .toggle-switch.active .toggle-slider { transform: translateX(18px); background: white; }
+
+        /* DOWNLOAD BTN */
+        .download-btn { padding: 9px 20px; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(34,197,94,0.45); transition: 0.2s; white-space: nowrap; }
+        .download-btn:hover { background: linear-gradient(135deg, #16a34a, #15803d); transform: translateY(-1px); }
+        .download-btn:disabled { background: #9ca3af; box-shadow: none; cursor: not-allowed; transform: none; }
+
+        /* KPI CARDS */
+        .top-row { display: none; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 28px 30px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        .card { background: var(--primary-gradient); padding: 22px 26px; border-radius: 18px; color: white; box-shadow: 0 10px 30px rgba(102,126,234,0.35); transition: 0.3s; min-height: 130px; display: flex; flex-direction: column; justify-content: center; position: relative; overflow: hidden; text-align: left; border: 1px solid rgba(255,255,255,0.15); }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(102,126,234,0.45); }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent); pointer-events: none; }
+        .card-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; opacity: 0.85; z-index: 1; }
+        .card-value { font-size: 34px; font-weight: 700; margin-top: 8px; line-height: 1; z-index: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card-sub { font-size: 11px; opacity: 0.75; margin-top: 6px; font-weight: 600; z-index: 1; }
+        .card-split { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; z-index: 1; }
+        .card-split-row { display: flex; justify-content: space-between; align-items: center; }
+        .card-split-label { font-size: 11px; opacity: 0.8; font-weight: 600; }
+        .card-split-val { font-size: 16px; font-weight: 700; }
+        .card-split-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.25); margin-top: 3px; overflow: hidden; }
+        .card-split-bar-fill { height: 100%; background: rgba(255,255,255,0.7); border-radius: 3px; transition: width 0.5s ease; }
+
+        /* MATRICES */
+        .tables-section { padding: 20px 30px; display: none; background: #f5f3ff; border-top: 2px solid #ddd6fe; }
+        .matrix-container { margin-bottom: 20px; border-radius: 14px; overflow: hidden; background: white; border: 1px solid #c4b5fd; box-shadow: 0 4px 20px rgba(102,78,180,0.12); }
+        .matrix-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 14px 22px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: none; }
+        .matrix-header:hover { background: linear-gradient(135deg, #5a6fd8 0%, #6a3f94 100%); }
+        .matrix-header h3 { font-size: 14px; color: white; font-weight: 700; letter-spacing: 0.3px; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .toggle-icon { font-weight: bold; color: rgba(255,255,255,0.9); font-size: 20px; }
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f1f5f9; color: #475569; font-weight: 700; padding: 10px 12px; font-size: 11px; text-transform: uppercase; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+        td { padding: 9px 12px; font-size: 12.5px; border-bottom: 1px solid #ede9f7; white-space: nowrap; }
+        tr:hover td { background: #f8faff; }
+        .subtotal-row td { background: #eef2ff !important; font-weight: 800; border-top: 2px solid #667eea; border-bottom: 2px solid #667eea; }
+        .number-right { text-align: right; }
+
+        /* GROUPED MATRIX */
+        .gmatrix { width:100%; border-collapse:collapse; font-size:12px; }
+        .gmatrix th { background:#f1f5f9; color:#475569; font-weight:700; padding:8px 10px; border:1px solid #e2e8f0; text-align:center; white-space:nowrap; font-size:11px; }
+        .gmatrix th.dim-h { background:#e2e8f0; text-align:left; vertical-align:middle; }
+        .gmatrix th.mo-h { background:linear-gradient(135deg,#667eea,#764ba2); color:white; text-align:center; cursor:pointer; user-select:none; }
+        .gmatrix th.mo-h:hover { opacity:0.9; }
+        .gmatrix th.sub-h { background:#f8fafc; font-size:10px; font-weight:600; color:#64748b; }
+        .gmatrix th.sub-h.exp-col { background:#eef2ff; color:#667eea; }
+        .gmatrix td { padding:7px 10px; border:1px solid #ede9f7; white-space:nowrap; font-size:12px; }
+        .gmatrix td.dim-col { background:white; font-weight:600; text-align:left; color:#334155; }
+        .gmatrix td.num-col { text-align:right; }
+        .gmatrix tr.subtotal-row td { background: linear-gradient(90deg,#ede9f7,#f0ebff) !important; font-weight:800; border-top:2px solid #764ba2; border-bottom:2px solid #764ba2; color:#4c1d95; }
+        .gmatrix tr:hover td:not(.dim-col) { background:#ede9f7; }
+        .mo-toggle { font-size:10px; margin-left:6px; background:rgba(255,255,255,0.25); border:none; color:white; border-radius:3px; padding:1px 5px; cursor:pointer; font-weight:700; }
+
+        /* CHARTS */
+        .charts-section { display: none; grid-template-columns: 1fr 1fr; gap: 30px; padding: 20px 30px 30px; background: #f8fafc; }
+        .chart-container { background: white; padding: 20px 25px 25px; border-radius: 16px; border: 1px solid #e2e8f0; height: 420px; box-shadow: 0 4px 20px rgba(0,0,0,0.07); position: relative; display: flex; flex-direction: column; transition: box-shadow 0.2s; }
+        .chart-container:hover { box-shadow: 0 8px 30px rgba(102,126,234,0.15); }
+        .chart-header { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+        .chart-canvas-wrap { flex: 1; position: relative; min-height: 0; }
+        .fullscreen-btn { padding: 5px 10px; font-size: 10px; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+        .fullscreen-btn:hover { background: #667eea; color: white; border-color: #667eea; }
+
+        /* ZM CHART FILTER */
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
+        .chart-header-right { display: flex; align-items: center; gap: 8px; }
+        .zm-pill-group { position: relative; }
+        .zm-pill-group .checkbox-list { top: calc(100% + 5px); left: 0; min-width: 200px; z-index: 9999; }
+        .chart-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; align-items: center; justify-content: center; padding: 30px; }
+        .chart-modal.active { display: flex; }
+        .chart-modal-inner { background: white; border-radius: 16px; padding: 30px; width: 100%; max-width: 1200px; height: 85vh; display: flex; flex-direction: column; position: relative; box-shadow: 0 25px 60px rgba(0,0,0,0.4); }
+        .chart-modal-title { font-size: 16px; font-weight: 700; color: #334155; margin-bottom: 16px; }
+        .chart-modal-canvas-wrap { flex: 1; position: relative; min-height: 0; }
+        .chart-modal-close { position: absolute; top: 16px; right: 20px; background: #f1f5f9; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700; color: #475569; cursor: pointer; }
+        .chart-modal-close:hover { background: #ef4444; color: white; }
+
+        /* SPARKLINES ON CARDS */
+        .card-sparkline { width: 100%; height: 45px; margin-top: 10px; z-index: 1; position: relative; opacity: 0.85; }
+
+        /* SORTABLE HEADERS */
+        th.sortable { cursor: pointer; user-select: none; position: relative; padding-right: 22px; }
+        th.sortable:hover { background: #e2e8f0; }
+        th.sortable::after { content: '⇅'; position: absolute; right: 6px; opacity: 0.4; font-size: 10px; }
+        th.sortable.asc::after  { content: '↑'; opacity: 1; color: #667eea; }
+        th.sortable.desc::after { content: '↓'; opacity: 1; color: #667eea; }
+
+        /* THRESHOLD COLOR CODING */
+        .disc-green { color: #16a34a !important; font-weight: 700; }
+        .disc-amber { color: #d97706 !important; font-weight: 700; }
+        .disc-red   { color: #dc2626 !important; font-weight: 700; }
+
+        /* MoM BADGE ON CARDS */
+        .card-mom { font-size: 12px; font-weight: 700; margin-top: 6px; z-index:1; display:flex; align-items:center; gap:5px; }
+        .mom-up   { color: #86efac; }
+        .mom-down { color: #fca5a5; }
+        .mom-flat { color: rgba(255,255,255,0.6); }
+
+        /* THRESHOLD SETTINGS PANEL */
+        .thr-btn { padding: 7px 13px; background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 7px; cursor: pointer; font-size: 11px; font-weight: 700; transition: 0.2s; white-space: nowrap; }
+        .thr-btn:hover { background: #667eea; color: white; border-color: #667eea; }
+        .thr-panel { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: white; border-radius: 16px; box-shadow: 0 25px 60px rgba(0,0,0,0.3); padding: 28px 32px; z-index: 99999; width: 380px; }
+        .thr-panel.active { display: block; }
+        .thr-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99998; }
+        .thr-overlay.active { display: block; }
+        .thr-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; }
+        .thr-row label { font-size: 12px; font-weight: 700; color: #475569; flex: 1; }
+        .thr-inputs { display: flex; gap: 8px; align-items: center; }
+        .thr-input-group { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .thr-input-group span { font-size: 9px; font-weight: 700; text-transform: uppercase; }
+        .thr-input-group span.green { color: #16a34a; }
+        .thr-input-group span.amber { color: #d97706; }
+        .thr-input { width: 62px; padding: 5px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; font-weight: 700; text-align: center; }
+        .thr-input:focus { outline: none; border-color: #667eea; }
+        .thr-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #f1f5f9; }
+        .thr-save { padding: 8px 18px; background: #667eea; color: white; border: none; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 700; }
+        .thr-cancel { padding: 8px 14px; background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 700; }
+
+        /* FIX: dim columns in matrix left-align explicitly */
+        td.dim-col { text-align: left !important; }
+        .drilldown-bar { display: none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 8px 16px; margin: 0 30px 10px; font-size: 12px; font-weight: 700; color: #92400e; align-items: center; justify-content: space-between; }
+        .drilldown-bar.active { display: flex; }
+        .drilldown-clear { background: #f59e0b; color: white; border: none; border-radius: 5px; padding: 3px 10px; cursor: pointer; font-size: 11px; font-weight: 700; }
+        .drilldown-clear:hover { background: #d97706; }
+        .loading { display: none; text-align: center; padding: 40px; }
+        .loading.active { display: block; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+
+        /* FROZEN MATRIX HEADER */
+        .matrix-wrap-outer { position: relative; }
+        .gmatrix-scroll { overflow-x: auto; overflow-y: auto; max-height: 520px; }
+        .gmatrix thead th { position: sticky; top: 0; z-index: 20; }
+        .gmatrix thead tr:first-child th { top: 0; }
+        .gmatrix thead tr:nth-child(2) th { top: 33px; }  /* offset = first row height */
+
+        /* COLUMN RESIZE */
+        .gmatrix th { position: relative; }
+        .col-resizer {
+            position: absolute; right: 0; top: 0; bottom: 0;
+            width: 5px; cursor: col-resize; z-index: 30;
+            background: transparent;
+        }
+        .col-resizer:hover, .col-resizer.dragging { background: #667eea; opacity: 0.5; border-radius: 2px; }
+
+        /* SORT ON DIM HEADERS */
+        .gmatrix th.dim-h { cursor: pointer; user-select: none; }
+        .gmatrix th.dim-h:hover { background: #d0d8e8; }
+        .gmatrix th.dim-h .sort-arrow { margin-left: 4px; opacity: 0.4; font-size: 10px; }
+        .gmatrix th.dim-h.sort-asc .sort-arrow { opacity: 1; color: #667eea; }
+        .gmatrix th.dim-h.sort-desc .sort-arrow { opacity: 1; color: #667eea; }
+
+        /* SORT ON SUB-HEADERS */
+        .gmatrix th.sub-h.sortable { cursor: pointer; user-select: none; }
+        .gmatrix th.sub-h.sortable:hover { background: #dde3f0; color: #334155; }
+
+        @media (max-width: 1200px) {
+            .top-row { grid-template-columns: repeat(2, 1fr); }
+            .charts-section { grid-template-columns: 1fr; }
+            #tablesSection .matrix-container[style*="grid"] { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 900px) {
+            #tablesSection > div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 768px) {
+            .filter-row { overflow-x: auto; }
+            .top-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- UPLOAD STRIP — sits above header -->
+    <div class="upload-section">
+        <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+            <h3 id="uploadLabel">📁 Click to Upload SAP Sales Data (Excel/CSV)</h3>
+            <p style="font-size:12px;color:#888;margin-top:6px;">Supports .xlsx, .xls, .csv — SAP export format</p>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+        </div>
+    </div>
+
+    <div class="header">
+        <div class="header-inner">
+            <div class="header-icon">📊</div>
+            <div>
+                <h1>Sales &amp; Discount Intelligence</h1>
+                <p class="header-sub">SAP Sales Analytics · Cascading Discount Engine · Real-time Matrix</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading"><div class="spinner"></div><p>Processing data, please wait...</p></div>
+
+    <!-- FILTERS -->
+    <div class="filters-section" id="filtersSection">
+        <div class="control-bar">
+            <div class="control-left">
+                <div class="toggle-group">
+                    <span class="toggle-label">Clear All Filters</span>
+                    <div class="toggle-switch" id="clearToggle" onclick="triggerClearFilters()"><div class="toggle-slider"></div></div>
+                </div>
+                <div class="toggle-group">
+                    <span class="toggle-label">Include Returns (Neg Qty)</span>
+                    <div class="toggle-switch" id="returnsToggle" onclick="toggleReturns()"><div class="toggle-slider"></div></div>
+                </div>
+                <button class="thr-btn" onclick="openThrPanel()">🎚️ Thresholds</button>
+            </div>
+            <button class="download-btn" id="downloadBtn" onclick="downloadFilteredExcel()" disabled>⬇️ Download Excel</button>
+        </div>
+        <div class="filter-row">
+            <div class="filter-group">
+                <span class="filter-label">Month</span>
+                <button class="filter-dropdown-btn" id="MonthBtn">Select Month</button>
+                <div id="MonthFilter" class="checkbox-list"></div>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">Sub-Zone</span>
+                <button class="filter-dropdown-btn" id="SubZoneBtn">Select Sub-Zone</button>
+                <div id="SubZoneFilter" class="checkbox-list"></div>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">ZM</span>
+                <button class="filter-dropdown-btn" id="ZMBtn">Select ZM</button>
+                <div id="ZMFilter" class="checkbox-list"></div>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">RM</span>
+                <button class="filter-dropdown-btn" id="RMBtn">Select RM</button>
+                <div id="RMFilter" class="checkbox-list"></div>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">SBU</span>
+                <button class="filter-dropdown-btn" id="SBUBtn">Select SBU</button>
+                <div id="SBUFilter" class="checkbox-list"></div>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">Sub-Group</span>
+                <button class="filter-dropdown-btn" id="SubGroupBtn">Select Sub-Group</button>
+                <div id="SubGroupFilter" class="checkbox-list"></div>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">Nature</span>
+                <button class="filter-dropdown-btn" id="NatureBtn">Select Nature</button>
+                <div id="NatureFilter" class="checkbox-list"></div>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">Business</span>
+                <button class="filter-dropdown-btn" id="BusinessBtn">Select Business</button>
+                <div id="BusinessFilter" class="checkbox-list"></div>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">Comp.</span>
+                <button class="filter-dropdown-btn" id="CompBtn">Select Comp.</button>
+                <div id="CompFilter" class="checkbox-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DRILL-DOWN BANNER -->
+    <div class="drilldown-bar" id="drilldownBar">
+        <span id="drilldownLabel">🔍 Drilled into: </span>
+        <button class="drilldown-clear" onclick="clearDrilldown()">✕ Clear Drill-down</button>
+    </div>
+
+    <!-- KPI CARDS: 4 cards -->
+    <div class="top-row" id="topRow">
+        <div class="card">
+            <div class="card-label">Basic Sales (Lakhs)</div>
+            <div class="card-value" id="basicValue">0.00</div>
+            <div class="card-mom" id="momSales"></div>
+            <canvas class="card-sparkline" id="sparkSales"></canvas>
+        </div>
+        <div class="card">
+            <div class="card-label">Overall Discount % (on MRP)</div>
+            <div class="card-value" id="totalDiscountPct">0.00%</div>
+            <div class="card-mom" id="momDisc"></div>
+            <canvas class="card-sparkline" id="sparkDisc"></canvas>
+        </div>
+        <!-- CARD 3: Scheme Impact -->
+        <div class="card" style="min-height:150px;">
+            <div class="card-label">🎯 Scheme Impact</div>
+            <div class="card-split">
+                <div>
+                    <div class="card-split-row">
+                        <span class="card-split-label">✅ With Sch Disc</span>
+                        <span class="card-split-val" id="withSchPct">0.00%</span>
+                    </div>
+                    <div class="card-split-bar"><div class="card-split-bar-fill" id="withSchBar" style="width:0%"></div></div>
+                </div>
+                <div>
+                    <div class="card-split-row">
+                        <span class="card-split-label">❌ Without Sch Disc</span>
+                        <span class="card-split-val" id="withoutSchPct">0.00%</span>
+                    </div>
+                    <div class="card-split-bar"><div class="card-split-bar-fill" id="withoutSchBar" style="width:0%"></div></div>
+                </div>
+            </div>
+        </div>
+        <!-- CARD 4: Mgmt Discount Split -->
+        <div class="card" style="min-height:150px;">
+            <div class="card-label">🔐 Mgmt Discount Split</div>
+            <div class="card-split">
+                <div>
+                    <div class="card-split-row">
+                        <span class="card-split-label">✅ With Mgmt Disc</span>
+                        <span class="card-split-val" id="withMgmtPct">0.00%</span>
+                    </div>
+                    <div class="card-split-bar"><div class="card-split-bar-fill" id="withMgmtBar" style="width:0%"></div></div>
+                </div>
+                <div>
+                    <div class="card-split-row">
+                        <span class="card-split-label">❌ Without Mgmt Disc</span>
+                        <span class="card-split-val" id="withoutMgmtPct">0.00%</span>
+                    </div>
+                    <div class="card-split-bar"><div class="card-split-bar-fill" id="withoutMgmtBar" style="width:0%"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MATRICES -->
+    <div class="tables-section" id="tablesSection">
+
+        <!-- MATRIX 1: ZM → RM → SubZone, Month-wise grouped columns -->
+        <div class="matrix-container">
+            <div class="matrix-header" onclick="toggleMatrix('matrix1Wrap')">
+                <h3>📅 Matrix 1: ZM × RM × Sub-Zone (Month-wise)</h3>
+                <span class="toggle-icon" id="matrix1Wrap_icon">+</span>
+            </div>
+            <div class="table-wrapper" id="matrix1Wrap" style="display:none">
+                <div id="matrix1Table"></div>
+            </div>
+        </div>
+
+        <!-- MATRIX 2: ZM → Customer Name, Month-wise grouped columns -->
+        <div class="matrix-container">
+            <div class="matrix-header" onclick="toggleMatrix('matrix2Wrap')">
+                <h3>👤 Matrix 2: ZM × Customer Name (Month-wise)</h3>
+                <span class="toggle-icon" id="matrix2Wrap_icon">+</span>
+            </div>
+            <div class="table-wrapper" id="matrix2Wrap" style="display:none">
+                <div id="matrix2Table"></div>
+            </div>
+        </div>
+
+        <!-- MATRIX 3: SBU × Sub-Group, Month-wise -->
+        <div class="matrix-container">
+            <div class="matrix-header" onclick="toggleMatrix('matrix3Wrap')">
+                <h3>📦 Matrix 3: SBU-wise (Month-wise)</h3>
+                <span class="toggle-icon" id="matrix3Wrap_icon">+</span>
+            </div>
+            <div class="table-wrapper" id="matrix3Wrap" style="display:none">
+                <div id="matrix3Table"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- CHART: ZM Disc% Trend only -->
+    <div class="charts-section" id="chartsSection" style="grid-template-columns:1fr;">
+        <div class="chart-container">
+            <div class="chart-header">
+                <div class="zm-pill-group" id="zmPillGroup">
+                    <button class="filter-dropdown-btn" id="zmChartBtn" style="min-width:120px; font-size:10px;" onclick="toggleZmChartDrop(event)">Select ZM</button>
+                    <div class="checkbox-list" id="zmChartDrop">
+                        <div class="filter-scroll-area">
+                            <label class="filter-item select-all-item"><input type="checkbox" id="zmChartAllCb"> Select All</label>
+                            <div class="item-box" id="zmChartItems"></div>
+                        </div>
+                        <div class="filter-actions">
+                            <button class="filter-btn cancel" onclick="closeZmChartDrop(false)">Cancel</button>
+                            <button class="filter-btn ok" onclick="closeZmChartDrop(true)">OK</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-header-right">
+                    <button class="fullscreen-btn" onclick="openChartModal('zmDiscChart','ZM-wise Monthly Total Disc% Trend')">⛶ Full View</button>
+                </div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="zmDiscChart"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<!-- THRESHOLD SETTINGS PANEL -->
+<div class="thr-overlay" id="thrOverlay" onclick="closeThrPanel()"></div>
+<div class="thr-panel" id="thrPanel">
+    <h3>🎚️ Color Threshold Settings</h3>
+    <div class="thr-row">
+        <label>Total Disc% — Green ≤ x, Amber ≤ y</label>
+        <div class="thr-inputs">
+            <div class="thr-input-group">
+                <span class="green">Green</span>
+                <input class="thr-input" id="thr_totalGreen" type="number" step="0.5" min="0" max="100">
+            </div>
+            <div class="thr-input-group">
+                <span class="amber">Amber</span>
+                <input class="thr-input" id="thr_totalAmber" type="number" step="0.5" min="0" max="100">
+            </div>
+        </div>
+    </div>
+    <div class="thr-row">
+        <label>Mgmt% — Amber ≤ x, else Red</label>
+        <div class="thr-inputs">
+            <div class="thr-input-group">
+                <span class="amber">Amber</span>
+                <input class="thr-input" id="thr_mgmtAmber" type="number" step="0.5" min="0" max="100">
+            </div>
+        </div>
+    </div>
+    <div class="thr-row">
+        <label>Sch% — Amber ≤ x, else Red</label>
+        <div class="thr-inputs">
+            <div class="thr-input-group">
+                <span class="amber">Amber</span>
+                <input class="thr-input" id="thr_schAmber" type="number" step="0.5" min="0" max="100">
+            </div>
+        </div>
+    </div>
+    <div style="font-size:11px;color:#94a3b8;margin-top:4px;">0% for Mgmt/Sch = only show color if discount exists</div>
+    <div class="thr-actions">
+        <button class="thr-cancel" onclick="closeThrPanel()">Cancel</button>
+        <button class="thr-save" onclick="saveThrPanel()">✓ Apply</button>
+    </div>
+</div>
+
+<!-- FULLSCREEN CHART MODAL -->
+<div class="chart-modal" id="chartModal" onclick="if(event.target===this)closeChartModal(null)">
+    <div class="chart-modal-inner">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div class="chart-modal-title" id="chartModalTitle" style="margin-bottom:0;"></div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <!-- ZM multi-select in modal -->
+                <div class="zm-pill-group" id="zmModalPillGroup" style="display:none; position:relative;">
+                    <button class="filter-dropdown-btn" id="zmModalBtn" style="min-width:140px; font-size:10px;" onclick="toggleZmModalDrop(event)">All ZMs</button>
+                    <div class="checkbox-list" id="zmModalDrop" style="right:0; left:auto;">
+                        <div class="filter-scroll-area">
+                            <label class="filter-item select-all-item"><input type="checkbox" id="zmModalAllCb"> Select All</label>
+                            <div class="item-box" id="zmModalItems"></div>
+                        </div>
+                        <div class="filter-actions">
+                            <button class="filter-btn cancel" onclick="closeZmModalDrop(false)">Cancel</button>
+                            <button class="filter-btn ok" onclick="closeZmModalDrop(true)">OK</button>
+                        </div>
+                    </div>
+                </div>
+                <button class="chart-modal-close" style="position:static;" onclick="closeChartModal(null)">✕ Close</button>
+            </div>
+        </div>
+        <div class="chart-modal-canvas-wrap"><canvas id="chartModalCanvas"></canvas></div>
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    // STATE
+    // ============================================================
+    let processedData = [];
+    let charts = {};
+    let includeReturns = false;
+    Chart.register(ChartDataLabels);
+
+    const MONTH_ORDER = ["April","May","June","July","August","September","October","November","December","January","February","March"];
+
+    const COL = {
+        mrp:       'DB  Price',
+        qty:       'Qty',
+        basic:     'Basic Value',
+        month:     'Months',
+        subzone:   'Sub-Zone',
+        zm:        'ZM',
+        rm:        'ZM / RM',
+        sbu:       'SBU',
+        subgroup:  'Sub- Group',
+        nature:    'Nature',
+        business:  'Business',
+        comp:      'Comp.',
+        custname:  'Customer Name',
+        pStd:      'Stand. Disc. (%)',
+        pGen:      'Gen. Disc. (%)',
+        pEarly:    'Early Disc. (%)',
+        pSch:      'Sch. Disc. (%)',
+        pMgmt:     'Mana. Disc. (%)'
+    };
+
+    const FILTER_DIMS = {
+        Month:    COL.month,
+        SubZone:  COL.subzone,
+        ZM:       COL.zm,
+        RM:       COL.rm,
+        SBU:      COL.sbu,
+        SubGroup: COL.subgroup,
+        Nature:   COL.nature,
+        Business: COL.business,
+        Comp:     COL.comp
+    };
+
+    let activeFilters = { Month:[], SubZone:[], ZM:[], RM:[], SBU:[], SubGroup:[], Nature:[], Business:[], Comp:[] };
+
+    function safeParse(v) {
+        if (v === '-' || v === '' || v == null) return 0;
+        const n = parseFloat(String(v).replace(/,/g,''));
+        return isNaN(n) ? 0 : n;
+    }
+
+    function fmtLakhs(v) {
+        return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v / 100000);
+    }
+
+    function fmtPct(v, dec=2) { return safeNum(v).toFixed(dec) + '%'; }
+    function safeNum(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+    function sortByMonth(a, b) {
+        const ia = MONTH_ORDER.indexOf(a), ib = MONTH_ORDER.indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    }
+
+    function preprocessDataset(rawRows) {
+        return rawRows.map(row => {
+            const mrp   = safeParse(row[COL.mrp]);
+            const qty   = safeParse(row[COL.qty]);
+            const basic = safeParse(row[COL.basic]);
+            const ps  = safeParse(row[COL.pStd])   / 100;
+            const pg  = safeParse(row[COL.pGen])    / 100;
+            const pe  = safeParse(row[COL.pEarly])  / 100;
+            const psc = safeParse(row[COL.pSch])    / 100;
+            const pm  = safeParse(row[COL.pMgmt])   / 100;
+            const stdCalc   = mrp * ps * qty;
+            const genCalc   = mrp * pg * qty;
+            const rem1      = (mrp * qty) - stdCalc - genCalc;
+            const earlyCalc = rem1 * pe;
+            const rem2      = rem1 - earlyCalc;
+            const schCalc   = rem2 * psc;
+            const rem3      = rem2 - schCalc;
+            const mgmtCalc  = rem3 * pm;
+
+            return {
+                ...row,
+                _month:    String(row[COL.month]  || '').trim(),
+                _subzone:  String(row[COL.subzone]|| '').trim(),
+                _zm:       String(row[COL.zm]     || '').trim(),
+                _rm:       String(row[COL.rm]     || '').trim(),
+                _sbu:      String(row[COL.sbu]    || '').trim(),
+                _subgroup: String(row[COL.subgroup]|| '').trim(),
+                _nature:   String(row[COL.nature] || '').trim(),
+                _business: String(row[COL.business]|| '').trim(),
+                _comp:     String(row[COL.comp]   || '').trim(),
+                _custname: String(row[COL.custname]|| '').trim(),
+                _qty:   qty,
+                _basic: basic,
+                _mrpQty: mrp * qty,
+                stdCalc, genCalc, earlyCalc, schCalc, mgmtCalc,
+                totalDiscCalc: stdCalc + genCalc + earlyCalc + schCalc + mgmtCalc,
+                hasMgmt: pm > 0,
+                hasSch:  psc > 0
+            };
+        });
+    }
+
+    function applyFilters() {
+        return processedData.filter(r => {
+            if (!includeReturns && r._qty < 0) return false;
+            if (activeFilters.Month.length    && !activeFilters.Month.includes(r._month))       return false;
+            if (activeFilters.SubZone.length  && !activeFilters.SubZone.includes(r._subzone))   return false;
+            if (activeFilters.ZM.length       && !activeFilters.ZM.includes(r._zm))             return false;
+            if (activeFilters.RM.length       && !activeFilters.RM.includes(r._rm))             return false;
+            if (activeFilters.SBU.length      && !activeFilters.SBU.includes(r._sbu))           return false;
+            if (activeFilters.SubGroup.length && !activeFilters.SubGroup.includes(r._subgroup)) return false;
+            if (activeFilters.Nature.length   && !activeFilters.Nature.includes(r._nature))     return false;
+            if (activeFilters.Business.length && !activeFilters.Business.includes(r._business)) return false;
+            if (activeFilters.Comp.length     && !activeFilters.Comp.includes(r._comp))         return false;
+            return true;
+        });
+    }
+
+    const sortState = { gm1:{col:null,dir:1}, gm2:{col:null,dir:1}, gm3:{col:null,dir:1} }; 
+
+    const THR = { totalDisc:{green:50, amber:55}, mgmt:{green:0, amber:2}, sch:{green:0, amber:3} };
+
+    function openThrPanel() {
+        document.getElementById('thr_totalGreen').value = THR.totalDisc.green;
+        document.getElementById('thr_totalAmber').value = THR.totalDisc.amber;
+        document.getElementById('thr_mgmtAmber').value  = THR.mgmt.amber;
+        document.getElementById('thr_schAmber').value   = THR.sch.amber;
+        document.getElementById('thrOverlay').classList.add('active');
+        document.getElementById('thrPanel').classList.add('active');
+    }
+    function closeThrPanel() {
+        document.getElementById('thrOverlay').classList.remove('active');
+        document.getElementById('thrPanel').classList.remove('active');
+    }
+    function saveThrPanel() {
+        THR.totalDisc.green = parseFloat(document.getElementById('thr_totalGreen').value) || 50;
+        THR.totalDisc.amber = parseFloat(document.getElementById('thr_totalAmber').value) || 55;
+        THR.mgmt.amber      = parseFloat(document.getElementById('thr_mgmtAmber').value)  || 2;
+        THR.sch.amber       = parseFloat(document.getElementById('thr_schAmber').value)   || 3;
+        closeThrPanel();
+        updateDashboard(); 
+    }
+
+    function discColor(val, type) {
+        if (type === 'total') return val <= THR.totalDisc.green ? 'disc-green' : val <= THR.totalDisc.amber ? 'disc-amber' : 'disc-red';
+        if (type === 'mgmt')  return val === 0 ? '' : val <= THR.mgmt.amber ? 'disc-amber' : 'disc-red';
+        if (type === 'sch')   return val === 0 ? '' : val <= THR.sch.amber  ? 'disc-amber' : 'disc-red';
+        return '';
+    }
+
+    // ── Animated counter for KPI cards ──
+    function animateValue(id, from, to, duration, fmt) {
+        const el = document.getElementById(id); if (!el) return;
+        const start = performance.now();
+        const diff = to - from;
+        function step(now) {
+            const elapsed = Math.min(now - start, duration);
+            const ease = 1 - Math.pow(1 - elapsed/duration, 3); // ease-out cubic
+            el.innerText = fmt(from + diff * ease);
+            if (elapsed < duration) requestAnimationFrame(step);
+            else el.innerText = fmt(to);
+        }
+        requestAnimationFrame(step);
+    }
+
+    function updateDashboard() {
+        const filtered = applyFilters();
+        const byMonth = {}, byZmMo = {}, byM1 = {}, byZmSz = {};
+        let tSales=0, tMrp=0, tDisc=0, tStd=0, tGen=0, tEarly=0, tSch=0, tMgmt=0;
+        let schSales=0, mgmtSales=0;
+
+        const bySbuSg = {};
+        filtered.forEach(r => {
+            tSales += r._basic; tMrp += r._mrpQty; tDisc += r.totalDiscCalc;
+            tStd += r.stdCalc; tGen += r.genCalc; tEarly += r.earlyCalc;
+            tSch += r.schCalc; tMgmt += r.mgmtCalc;
+            if (r.hasSch)  schSales  += r._basic;
+            if (r.hasMgmt) mgmtSales += r._basic;
+
+            const mo = r._month||'N/A', zm = r._zm||'N/A', sz = r._subzone||'N/A';
+            const rm = r._rm||'N/A', cust = r._custname||'N/A', sb = r._sbu||'N/A';
+            const sg = r._subgroup||'N/A';
+
+            if (!byMonth[mo]) byMonth[mo] = {sales:0,mrp:0,disc:0,std:0,gen:0,early:0,sch:0,mgmt:0};
+            byMonth[mo].sales+=r._basic; byMonth[mo].mrp+=r._mrpQty; byMonth[mo].disc+=r.totalDiscCalc;
+            byMonth[mo].std+=r.stdCalc; byMonth[mo].gen+=r.genCalc; byMonth[mo].early+=r.earlyCalc;
+            byMonth[mo].sch+=r.schCalc; byMonth[mo].mgmt+=r.mgmtCalc;
+
+            const k1 = zm+'||'+rm+'||'+sz;
+            if (!byM1[k1]) byM1[k1] = {_zm:zm,_rm:rm,_subzone:sz,byMo:{}};
+            if (!byM1[k1].byMo[mo]) byM1[k1].byMo[mo] = {sales:0,mrp:0,disc:0,std:0,gen:0,early:0,sch:0,mgmt:0};
+            const bk1 = byM1[k1].byMo[mo];
+            bk1.sales+=r._basic; bk1.mrp+=r._mrpQty; bk1.disc+=r.totalDiscCalc;
+            bk1.std+=r.stdCalc; bk1.gen+=r.genCalc; bk1.early+=r.earlyCalc;
+            bk1.sch+=r.schCalc; bk1.mgmt+=r.mgmtCalc;
+
+            const k2 = zm+'||'+cust;
+            if (!byZmSz[k2]) byZmSz[k2] = {_zm:zm,_cust:cust,byMo:{}};
+            if (!byZmSz[k2].byMo[mo]) byZmSz[k2].byMo[mo] = {sales:0,mrp:0,disc:0,std:0,gen:0,early:0,sch:0,mgmt:0};
+            const bk2 = byZmSz[k2].byMo[mo];
+            bk2.sales+=r._basic; bk2.mrp+=r._mrpQty; bk2.disc+=r.totalDiscCalc;
+            bk2.std+=r.stdCalc; bk2.gen+=r.genCalc; bk2.early+=r.earlyCalc;
+            bk2.sch+=r.schCalc; bk2.mgmt+=r.mgmtCalc;
+
+            // Matrix 3: SBU only
+            const k3 = sb;
+            if (!bySbuSg[k3]) bySbuSg[k3] = {_sbu:sb,byMo:{}};
+            if (!bySbuSg[k3].byMo[mo]) bySbuSg[k3].byMo[mo] = {sales:0,mrp:0,disc:0,std:0,gen:0,early:0,sch:0,mgmt:0};
+            const bk3 = bySbuSg[k3].byMo[mo];
+            bk3.sales+=r._basic; bk3.mrp+=r._mrpQty; bk3.disc+=r.totalDiscCalc;
+            bk3.std+=r.stdCalc; bk3.gen+=r.genCalc; bk3.early+=r.earlyCalc;
+            bk3.sch+=r.schCalc; bk3.mgmt+=r.mgmtCalc;
+
+            const kzm = zm+'||'+mo;
+            if (!byZmMo[kzm]) byZmMo[kzm] = {mrp:0,disc:0};
+            byZmMo[kzm].mrp+=r._mrpQty; byZmMo[kzm].disc+=r.totalDiscCalc;
+        });
+
+        function toRow(o) {
+            const m = o.mrp||1;
+            const rem1 = m - (o.std||0) - (o.gen||0);
+            const rem2 = rem1 - (o.early||0);
+            const rem3 = rem2 - (o.sch||0);
+            return { sales:o.sales, dP:o.disc/m*100, sP:o.std/m*100, gP:o.gen/m*100,
+                     eP:o.early/(rem1||1)*100, schP:o.sch/(rem2||1)*100, mP:o.mgmt/(rem3||1)*100 };
+        }
+
+        const schPct    = tSales ? schSales/tSales*100   : 0;
+        const noSchPct  = 100 - schPct;
+        const mgmtPct   = tSales ? mgmtSales/tSales*100  : 0;
+        const noMgmtPct = 100 - mgmtPct;
+        animateValue('basicValue',    parseFloat(document.getElementById('basicValue').innerText.replace(/,/g,''))||0,    tSales/100000,       700, v => new Intl.NumberFormat('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v));
+        animateValue('totalDiscountPct', parseFloat(document.getElementById('totalDiscountPct').innerText)||0, tMrp?tDisc/tMrp*100:0, 700, v => v.toFixed(2)+'%');
+        animateValue('withSchPct',    parseFloat(document.getElementById('withSchPct').innerText)||0,    schPct,    600, v => v.toFixed(2)+'%');
+        animateValue('withoutSchPct', parseFloat(document.getElementById('withoutSchPct').innerText)||0, noSchPct,  600, v => v.toFixed(2)+'%');
+        document.getElementById('withSchBar').style.width     = schPct+'%';
+        document.getElementById('withoutSchBar').style.width  = noSchPct+'%';
+        animateValue('withMgmtPct',    parseFloat(document.getElementById('withMgmtPct').innerText)||0,    mgmtPct,    600, v => v.toFixed(2)+'%');
+        animateValue('withoutMgmtPct', parseFloat(document.getElementById('withoutMgmtPct').innerText)||0, noMgmtPct,  600, v => v.toFixed(2)+'%');
+        document.getElementById('withMgmtBar').style.width    = mgmtPct+'%';
+
+        const moKeys = Object.keys(byMonth).sort(sortByMonth);
+        if (moKeys.length >= 2) {
+            const cur = toRow(byMonth[moKeys[moKeys.length-1]]);
+            const prv = toRow(byMonth[moKeys[moKeys.length-2]]);
+            function momBadge(id, cv, pv, isCur) {
+                const el = document.getElementById(id); if(!el) return;
+                const diff = cv-pv; if(!pv) { el.innerHTML=''; return; }
+                const pct = (diff/Math.abs(pv)*100).toFixed(1);
+                const arrow = diff>0?'▲':diff<0?'▼':'●';
+                const cls = diff>0?'mom-up':diff<0?'mom-down':'mom-flat';
+                el.innerHTML = `<span class="${cls}">${arrow} ${isCur ? Math.abs(diff/100000).toFixed(2)+'L ('+Math.abs(pct)+'%)' : Math.abs(diff).toFixed(2)+'% pts'} vs prev month</span>`;
+            }
+            momBadge('momSales', cur.sales, prv.sales, true);
+            momBadge('momDisc',  cur.dP,    prv.dP,    false);
+        }
+
+        const totBucket = {sales:tSales,mrp:tMrp,disc:tDisc,std:tStd,gen:tGen,early:tEarly,sch:tSch,mgmt:tMgmt};
+        const m1rows = Object.values(byM1).sort((a,b)=>a._zm.localeCompare(b._zm)||a._rm.localeCompare(b._rm)||a._subzone.localeCompare(b._subzone));
+        renderGroupedMatrix('matrix1Table', ['ZM','RM','Sub-Zone'], m1rows, row=>[row._zm,row._rm,row._subzone], moKeys, totBucket, 'gm1');
+        const m2rows = Object.values(byZmSz).sort((a,b)=>a._zm.localeCompare(b._zm)||a._cust.localeCompare(b._cust));
+        renderGroupedMatrix('matrix2Table', ['ZM','Customer Name'], m2rows, row=>[row._zm,row._cust], moKeys, totBucket, 'gm2');
+        const m3rows = Object.values(bySbuSg).sort((a,b)=>a._sbu.localeCompare(b._sbu));
+        renderGroupedMatrix('matrix3Table', ['SBU'], m3rows, row=>[row._sbu], moKeys, totBucket, 'gm3');
+
+        const moMonthly = moKeys.map(mo => ({_month:mo,...toRow(byMonth[mo])}));
+        moMonthly.forEach(d => d.sales = byMonth[d._month].sales);
+        drawSparklineData(moMonthly);
+
+        updateCharts(filtered, byMonth, byZmMo, moKeys);
+    }
+
+    const expandedMonths = {}; 
+    const gMatrixCache = {};
+
+    function sortMatrix(matId, col) {
+        if (!sortState[matId]) sortState[matId] = {col:null, dir:-1};
+        const ss = sortState[matId];
+        if (ss.col === col) ss.dir = -ss.dir; else { ss.col = col; ss.dir = -1; }
+        const c = gMatrixCache[matId]; if (!c) return;
+
+        // Map col key → how to get the value from aggregated month buckets
+        const DISC_MAP = { disc:'disc', std:'std', gen:'gen', early:'early', sch:'sch', mgmt:'mgmt' };
+        const MRP_NEEDED = new Set(['disc','std','gen','early','sch','mgmt']);
+
+        c.rows.sort((a, b) => {
+            let av = 0, bv = 0;
+
+            // Sort on dim string columns (dim0, dim1, ...)
+            if (col.startsWith('dim')) {
+                const idx = parseInt(col.replace('dim',''));
+                const ad = c.dimFn(a)[idx] || '';
+                const bd = c.dimFn(b)[idx] || '';
+                return ss.dir * ad.localeCompare(bd);
+            }
+
+            // Sort on sales (absolute value sum across months)
+            if (col === 'sales') {
+                c.moKeys.forEach(mo => {
+                    const ab=(a.byMo||{})[mo], bb=(b.byMo||{})[mo];
+                    av += ab?ab.sales:0; bv += bb?bb.sales:0;
+                });
+                return ss.dir * (bv - av);
+            }
+
+            // Sort on disc% metrics (ratio columns)
+            if (DISC_MAP[col]) {
+                let an=0, bn=0, am=0, bm=0;
+                c.moKeys.forEach(mo => {
+                    const ab=(a.byMo||{})[mo], bb=(b.byMo||{})[mo];
+                    const k = DISC_MAP[col];
+                    an += ab?ab[k]:0; am += ab?ab.mrp:0;
+                    bn += bb?bb[k]:0; bm += bb?bb.mrp:0;
+                });
+                av = am ? an/am*100 : 0;
+                bv = bm ? bn/bm*100 : 0;
+                return ss.dir * (bv - av);
+            }
+
+            return 0;
+        });
+        renderGroupedMatrix(c.containerId, c.dimLabels, c.rows, c.dimFn, c.moKeys, c.totBucket, matId);
+    }
+
+    function renderGroupedMatrix(containerId, dimLabels, rows, dimFn, moKeys, totBucket, matId) {
+        gMatrixCache[matId] = {containerId, dimLabels, rows, dimFn, moKeys, totBucket, matId};
+        const EXP_COLS = ['Std%','Gen%','Early%','Sch%','Mgmt%'];
+        const EXP_KEYS = ['sP','gP','eP','schP','mP'];
+        const EXP_TYPES= [null,null,null,'sch','mgmt'];
+        const moTotals = {};
+        moKeys.forEach(mo => moTotals[mo] = {sales:0,mrp:0,disc:0,std:0,gen:0,early:0,sch:0,mgmt:0});
+        rows.forEach(row => {
+            moKeys.forEach(mo => {
+                const b = (row.byMo||{})[mo]; if (!b) return;
+                moTotals[mo].sales+=b.sales; moTotals[mo].mrp+=b.mrp; moTotals[mo].disc+=b.disc;
+                moTotals[mo].std+=b.std; moTotals[mo].gen+=b.gen; moTotals[mo].early+=b.early;
+                moTotals[mo].sch+=b.sch; moTotals[mo].mgmt+=b.mgmt;
+            });
+        });
+
+        function moRow(b) {
+            const m = (b&&b.mrp)||1;
+            const rem1 = m - ((b&&b.std)||0) - ((b&&b.gen)||0);
+            const rem2 = rem1 - ((b&&b.early)||0);
+            const rem3 = rem2 - ((b&&b.sch)||0);
+            return { sales:b?b.sales:0,
+                dP:b?b.disc/m*100:0, sP:b?b.std/m*100:0, gP:b?b.gen/m*100:0,
+                eP:b?b.early/(rem1||1)*100:0, schP:b?b.sch/(rem2||1)*100:0, mP:b?b.mgmt/(rem3||1)*100:0 };
+        }
+
+        const ss = sortState[matId]||{};
+
+        function sortArrow(col) {
+            if (ss.col !== col) return '<span class="sort-arrow">⇅</span>';
+            return ss.dir===-1 ? '<span class="sort-arrow">↓</span>' : '<span class="sort-arrow">↑</span>';
+        }
+        function sortCls(col) {
+            if (ss.col !== col) return '';
+            return ss.dir===-1 ? ' sort-desc' : ' sort-asc';
+        }
+
+        function cellsForMo(b, mo) {
+            const exp = expandedMonths[matId+'_'+mo];
+            const d = moRow(b);
+            let out = `<td class="num-col">${fmtLakhs(d.sales)}</td>`;
+            out += `<td class="num-col"><b class="${discColor(d.dP,'total')}">${fmtPct(d.dP)}</b></td>`;
+            if (exp) {
+                out += `<td class="num-col">${fmtPct(d.sP,1)}</td>`;
+                out += `<td class="num-col">${fmtPct(d.gP,1)}</td>`;
+                out += `<td class="num-col">${fmtPct(d.eP,1)}</td>`;
+                out += `<td class="num-col"><span class="${discColor(d.schP,'sch')}">${fmtPct(d.schP,1)}</span></td>`;
+                out += `<td class="num-col"><span class="${discColor(d.mP,'mgmt')}">${fmtPct(d.mP,1)}</span></td>`;
+            }
+            return out;
+        }
+
+        // ── Row 1: dim headers (sortable) + month group headers ──
+        let h1 = dimLabels.map((l,i) => {
+            const col = 'dim'+i;
+            return `<th class="dim-h${sortCls(col)}" rowspan="2" onclick="sortMatrix('${matId}','${col}')">${l} ${sortArrow(col)}<div class="col-resizer" onmousedown="initResize(event)"></div></th>`;
+        }).join('');
+        moKeys.forEach(mo => {
+            const exp = expandedMonths[matId+'_'+mo];
+            h1 += `<th class="mo-h" colspan="${exp?7:2}">${mo.toUpperCase()} <button class="mo-toggle" onclick="toggleMonthCol('${matId}','${mo}')">${exp?'−':'+'}</button><div class="col-resizer" onmousedown="initResize(event)"></div></th>`;
+        });
+
+        // ── Row 2: sub-headers (all sortable — Sales, Total Disc%, Std%, Gen%, Early%, Sch%, Mgmt%) ──
+        let h2 = '';
+        moKeys.forEach(mo => {
+            const exp = expandedMonths[matId+'_'+mo];
+            h2 += `<th class="sub-h sortable${sortCls('sales')}" onclick="sortMatrix('${matId}','sales')">Sales (L) ${sortArrow('sales')}<div class="col-resizer" onmousedown="initResize(event)"></div></th>`;
+            h2 += `<th class="sub-h sortable${sortCls('disc')}"  onclick="sortMatrix('${matId}','disc')">Total Disc% ${sortArrow('disc')}<div class="col-resizer" onmousedown="initResize(event)"></div></th>`;
+            if (exp) {
+                const subCols = [['std','Std%'],['gen','Gen%'],['early','Early%'],['sch','Sch%'],['mgmt','Mgmt%']];
+                subCols.forEach(([k,label]) => {
+                    h2 += `<th class="sub-h exp-col sortable${sortCls(k)}" onclick="sortMatrix('${matId}','${k}')">${label} ${sortArrow(k)}<div class="col-resizer" onmousedown="initResize(event)"></div></th>`;
+                });
+            }
+        });
+
+        // ── Subtotal row ──
+        let totCells = dimLabels.map((_,i)=>i===0?`<td class="dim-col"><b>SUBTOTAL</b></td>`:`<td class="dim-col"></td>`).join('');
+        moKeys.forEach(mo => { totCells += cellsForMo(moTotals[mo], mo); });
+
+        // ── Data rows ──
+        const dataRows = rows.map(row => {
+            const dims = dimFn(row).map(v=>`<td class="dim-col">${v}</td>`).join('');
+            let cells = '';
+            moKeys.forEach(mo => { cells += cellsForMo((row.byMo||{})[mo], mo); });
+            return `<tr>${dims}${cells}</tr>`;
+        }).join('');
+
+        document.getElementById(containerId).innerHTML =
+            `<div class="gmatrix-scroll"><table class="gmatrix"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody><tr class="subtotal-row">${totCells}</tr>${dataRows}</tbody></table></div>`;
+
+        // Init resize after render
+        initAllResizers(containerId);
+    }
+
+    // ── Column Resize ──
+    function initResize(e) {
+        e.stopPropagation(); // don't trigger sort
+        const resizer = e.target;
+        const th = resizer.parentElement;
+        const startX = e.pageX;
+        const startW = th.offsetWidth;
+        resizer.classList.add('dragging');
+        function onMove(ev) {
+            const newW = Math.max(40, startW + ev.pageX - startX);
+            th.style.minWidth = newW + 'px';
+            th.style.width    = newW + 'px';
+        }
+        function onUp() {
+            resizer.classList.remove('dragging');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }
+
+    function initAllResizers(containerId) {
+        // Resizers are already injected via HTML; initResize handles mouse events.
+        // Nothing extra needed — onmousedown="initResize(event)" is inline.
+    }
+
+    function toggleMonthCol(matId, mo) {
+        expandedMonths[matId+'_'+mo] = !expandedMonths[matId+'_'+mo];
+        const c = gMatrixCache[matId];
+        renderGroupedMatrix(c.containerId, c.dimLabels, c.rows, c.dimFn, c.moKeys, c.totBucket, matId);
+    }
+
+    function drawSparklineData(monthly) {
+        function spark(canvasId, values, color) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const w = canvas.offsetWidth || 200, h = canvas.offsetHeight || 45;
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0,0,w,h);
+            if (values.length < 2) return;
+            const min = Math.min(...values), max = Math.max(...values), range = max-min||1, pad = 6;
+            const pts = values.map((v,i)=>({x:pad+(i/(values.length-1))*(w-pad*2), y:h-pad-((v-min)/range)*(h-pad*2)}));
+
+            // Gradient fill
+            const grad = ctx.createLinearGradient(0,0,0,h);
+            grad.addColorStop(0, color.replace('1)','0.25)'));
+            grad.addColorStop(1, color.replace('1)','0.02)'));
+            ctx.beginPath(); ctx.moveTo(pts[0].x, h);
+            pts.forEach(p=>ctx.lineTo(p.x, p.y));
+            ctx.lineTo(pts[pts.length-1].x, h); ctx.closePath();
+            ctx.fillStyle = grad; ctx.fill();
+
+            // Glow line
+            ctx.save();
+            ctx.shadowColor = color; ctx.shadowBlur = 6;
+            ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+            pts.forEach(p=>ctx.lineTo(p.x, p.y));
+            ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+            ctx.restore();
+
+            // Endpoint dot with pulse ring
+            const last = pts[pts.length-1];
+            ctx.beginPath(); ctx.arc(last.x, last.y, 4, 0, Math.PI*2);
+            ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fill();
+            ctx.shadowBlur = 0;
+            // Tick dots on all points
+            pts.forEach(p => {
+                ctx.beginPath(); ctx.arc(p.x, p.y, 1.5, 0, Math.PI*2);
+                ctx.fillStyle = color.replace('1)','0.6)'); ctx.fill();
+            });
+        }
+        spark('sparkSales', monthly.map(d=>+safeNum(d.sales/100000).toFixed(2)), 'rgba(255,255,255,1)');
+        spark('sparkDisc',  monthly.map(d=>+safeNum(d.dP).toFixed(2)), 'rgba(255,220,100,1)');
+    }
+
+    function updateCharts(filtered, byMonth, byZmMo, moKeys) {
+        if (charts.bar)  { charts.bar.destroy();  charts.bar  = null; }
+        const allZms = [...new Set(filtered.map(r => r._zm).filter(Boolean))].sort();
+        populateZmDropdowns(allZms);
+        buildZmChartConfig(byZmMo, moKeys, allZms);
+    }
+
+    let _lastByZmMo = {}, _lastMoKeys = [], _lastAllZms = [];
+    const ZM_COLORS = ['#667eea','#10b981','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899','#14b8a6','#f59e0b'];
+
+    // Builds a Chart.js config object — used for both main chart and modal
+    function makeZmChartCfg() {
+        const months = _lastMoKeys, zmMonthMap = {};
+        Object.entries(_lastByZmMo).forEach(([k, v]) => {
+            const [zm, mo] = k.split('||');
+            if (!zmMonthMap[zm]) zmMonthMap[zm] = {};
+            zmMonthMap[zm][mo] = v;
+        });
+        const visZMs = zmChartSelected.length ? zmChartSelected : _lastAllZms.slice(0, 5);
+        const datasets = visZMs.map((zm, i) => {
+            const color = ZM_COLORS[i % ZM_COLORS.length];
+            return {
+                label: zm,
+                data: months.map(mo => {
+                    const d = (zmMonthMap[zm]||{})[mo];
+                    return d && d.mrp ? +((d.disc / d.mrp) * 100).toFixed(2) : null;
+                }),
+                borderColor: color,
+                backgroundColor: color + '22',
+                pointBackgroundColor: color,
+                tension: 0.4, fill: false, spanGaps: true,
+                pointRadius: 5, pointHoverRadius: 7, borderWidth: 2
+            };
+        });
+        return {
+            type: 'line',
+            data: { labels: months, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ctx.parsed.y != null
+                                ? ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + '%'
+                                : ctx.dataset.label + ': N/A'
+                        }
+                    },
+                    datalabels: {
+                        display: true,
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: v => v != null ? v.toFixed(1) + '%' : '',
+                        font: { size: 9, weight: '700' },
+                        color: ctx => ZM_COLORS[ctx.datasetIndex % ZM_COLORS.length],
+                        clamp: true
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Month', font: { size: 11 } },
+                        ticks: { font: { size: 10 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        min: 0,
+                        max: 100,
+                        title: { display: true, text: 'Total Disc%', font: { size: 11 } },
+                        ticks: {
+                            callback: v => v + '%',
+                            stepSize: 25,
+                            values: [0, 25, 50, 100]
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    function buildZmChartConfig(byZmMo, moKeys, allZms) {
+        if (charts.bar) { charts.bar.destroy(); charts.bar = null; }
+        if (byZmMo)  _lastByZmMo  = byZmMo;
+        if (moKeys)  _lastMoKeys  = moKeys;
+        if (allZms)  _lastAllZms  = allZms;
+        const cfg = makeZmChartCfg();
+        lastChartConfigs['zmDiscChart'] = cfg;
+        charts.bar = new Chart(document.getElementById('zmDiscChart'), cfg);
+    }
+
+    // FIX: Syntax fix and null-canvas check for Trend Chart
+    function buildTrendChartConfig(byMonth, moKeys) {
+        const months = moKeys || _lastMoKeys;
+        const cfg2 = {
+            type: 'line',
+            data: { labels: months, datasets: [] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: true } },
+                scales: { y: { min: 0, max: 10, ticks: { stepSize: 1, callback: v => v + '%' } } }
+            }
+        };
+        const ctx = document.getElementById('mgmtTrendChart');
+        if (ctx) charts.line = new Chart(ctx, cfg2);
+    }
+
+    const DIM_RAW_KEY = { Month:'_month', SubZone:'_subzone', ZM:'_zm', RM:'_rm', SBU:'_sbu', SubGroup:'_subgroup', Nature:'_nature', Business:'_business', Comp:'_comp' };
+    function refreshFiltersUI() {
+        Object.keys(activeFilters).forEach(dim => {
+            const btn = document.getElementById(dim + 'Btn'); if (!btn) return;
+            const sel = activeFilters[dim];
+            btn.innerText = !sel.length ? 'Select ' + dim : sel.length === 1 ? sel[0] : sel.length + ' Selected';
+        });
+    }
+
+    function buildFilterList(dim) {
+        const rawKey = DIM_RAW_KEY[dim];
+        let items = [...new Set(processedData.map(r => r[rawKey] || ''))].filter(Boolean);
+        if (dim === 'Month') items.sort(sortByMonth); else items.sort();
+        renderList(dim, items);
+    }
+
+    function renderList(dim, items) {
+        const container = document.getElementById(dim + 'Filter'), selected = activeFilters[dim];
+        container.innerHTML = `<div class="filter-scroll-area"><label class="filter-item select-all-item"><input type="checkbox" class="all-cb"> Select All</label><div class="item-box">${items.map(item => `<label class="filter-item"><input type="checkbox" class="item-cb" value="${item}" ${selected.includes(item)?'checked':''}> ${item}</label>`).join('')}</div></div><div class="filter-actions"><button class="filter-btn ok" onclick="closeFilter('${dim}',true)">OK</button></div>`;
+        container.querySelector('.all-cb').onchange = e => container.querySelectorAll('.item-cb').forEach(c => c.checked = e.target.checked);
+    }
+
+    function closeFilter(dim, apply) {
+        if (apply) { activeFilters[dim] = Array.from(document.querySelectorAll(`#${dim}Filter .item-cb:checked`)).map(c => c.value); updateDashboard(); }
+        document.getElementById(dim + 'Filter').classList.remove('active');
+        refreshFiltersUI();
+    }
+
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.filter-dropdown-btn');
+        if (btn) {
+            const dim = btn.id.replace('Btn','');
+            const list = document.getElementById(dim + 'Filter');
+            if (list) { list.classList.toggle('active'); if(list.classList.contains('active')) buildFilterList(dim); }
+        }
+    });
+
+    function triggerClearFilters() { Object.keys(activeFilters).forEach(k => activeFilters[k] = []); updateDashboard(); refreshFiltersUI(); }
+    function toggleReturns() { includeReturns = !includeReturns; updateDashboard(); }
+    function toggleMatrix(id) { const el = document.getElementById(id); const open = el.style.display==='none'; el.style.display = open?'block':'none'; const icon = document.getElementById(id+'_icon'); if(icon) icon.textContent = open?'−':'+'; }
+
+    document.getElementById('fileInput').onchange = function(e) {
+        var file = e.target.files[0]; if (!file) return;
+        document.getElementById('loading').classList.add('active');
+        document.getElementById('uploadLabel').innerText = '⏳ Processing ' + file.name + '...';
+        var reader = new FileReader();
+        reader.onerror = function() { alert('Could not read file.'); document.getElementById('loading').classList.remove('active'); };
+        reader.onload = function(evt) {
+            try {
+                var wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+                processedData = preprocessDataset(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' }));
+                if (!processedData.length) { alert('No data rows found.'); document.getElementById('loading').classList.remove('active'); return; }
+                Object.keys(activeFilters).forEach(function(k) { activeFilters[k] = []; });
+                zmChartSelected = [];
+                refreshFiltersUI();
+                // CRITICAL: show sections first so Chart.js can measure canvas size
+                document.getElementById('filtersSection').style.display = 'block';
+                document.getElementById('topRow').style.display         = 'grid';
+                document.getElementById('tablesSection').style.display  = 'block';
+                document.getElementById('chartsSection').style.display  = 'grid';
+                document.getElementById('downloadBtn').disabled          = false;
+                if (charts.bar)  { charts.bar.destroy();  charts.bar  = null; }
+                document.getElementById('uploadLabel').innerText = '✅ ' + file.name;
+                requestAnimationFrame(function() {
+                    requestAnimationFrame(function() {
+                        updateDashboard();
+                        document.getElementById('loading').classList.remove('active');
+                    });
+                });
+            } catch(err) {
+                console.error(err); alert('Error: ' + err.message);
+                document.getElementById('loading').classList.remove('active');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    let zmChartSelected = [];
+    function populateZmDropdowns(list) {
+        const box = document.getElementById('zmChartItems'); if(!box) return;
+        box.innerHTML = list.map(z => `<label class="filter-item"><input type="checkbox" class="zm-item-cb" value="${z}" checked> ${z}</label>`).join('');
+    }
+    function toggleZmChartDrop(e) { e.stopPropagation(); document.getElementById('zmChartDrop').classList.toggle('active'); }
+    function closeZmChartDrop(apply) { 
+        if(apply) { zmChartSelected = Array.from(document.querySelectorAll('.zm-item-cb:checked')).map(c=>c.value); updateDashboard(); }
+        document.getElementById('zmChartDrop').classList.remove('active'); 
+    }
+
+    let lastChartConfigs = {};
+    let _modalChart = null;
+
+    function openChartModal(canvasId, title) {
+        document.getElementById('chartModalTitle').innerText = title;
+        document.getElementById('chartModal').classList.add('active');
+
+        // Destroy previous modal chart so canvas is clean
+        if (_modalChart) { _modalChart.destroy(); _modalChart = null; }
+        const canvas = document.getElementById('chartModalCanvas');
+        // Clear the canvas manually to avoid ghost renders
+        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+
+        // Show ZM filter inside modal and sync its checkboxes to current selection
+        const modalPillGroup = document.getElementById('zmModalPillGroup');
+        if (canvasId === 'zmDiscChart') {
+            modalPillGroup.style.display = 'block';
+            syncModalZmFilter();
+        } else {
+            modalPillGroup.style.display = 'none';
+        }
+
+        // Build fresh config (same function as main chart — guaranteed identical)
+        const cfg = makeZmChartCfg();
+        _modalChart = new Chart(canvas, cfg);
+    }
+
+    function closeChartModal(e) {
+        if (e && e.target !== document.getElementById('chartModal')) return;
+        document.getElementById('chartModal').classList.remove('active');
+        if (_modalChart) { _modalChart.destroy(); _modalChart = null; }
+    }
+
+    // Sync modal ZM checkboxes to match main chart selection
+    function syncModalZmFilter() {
+        const allCbEl = document.getElementById('zmModalAllCb');
+        if (allCbEl) allCbEl.onchange = e => {
+            document.querySelectorAll('.zm-modal-cb').forEach(c => c.checked = e.target.checked);
+        };
+        const box = document.getElementById('zmModalItems'); if (!box) return;
+        box.innerHTML = _lastAllZms.map(z =>
+            `<label class="filter-item"><input type="checkbox" class="zm-modal-cb" value="${z}" ${
+                (zmChartSelected.length === 0 || zmChartSelected.includes(z)) ? 'checked' : ''
+            }> ${z}</label>`
+        ).join('');
+        const allCb = document.getElementById('zmModalAllCb');
+        if (allCb) allCb.checked = zmChartSelected.length === 0;
+    }
+
+    function toggleZmModalDrop(e) {
+        e.stopPropagation();
+        document.getElementById('zmModalDrop').classList.toggle('active');
+    }
+    function closeZmModalDrop(apply) {
+        if (apply) {
+            zmChartSelected = Array.from(document.querySelectorAll('.zm-modal-cb:checked')).map(c => c.value);
+            // Rebuild BOTH main chart and modal chart with new selection
+            buildZmChartConfig();
+            if (_modalChart) { _modalChart.destroy(); _modalChart = null; }
+            _modalChart = new Chart(document.getElementById('chartModalCanvas'), makeZmChartCfg());
+            // Sync the main chart ZM filter button text
+            const btn = document.getElementById('zmChartBtn');
+            if (btn) btn.innerText = zmChartSelected.length === 0 ? 'Select ZM' :
+                zmChartSelected.length === 1 ? zmChartSelected[0] : zmChartSelected.length + ' ZMs';
+        }
+        document.getElementById('zmModalDrop').classList.remove('active');
+    }
+
+    function downloadFilteredExcel() {
+        const wb = XLSX.utils.book_new();
+
+        // Helper: flatten a matrix cache entry to rows for Excel
+        function matrixToRows(matId) {
+            const c = gMatrixCache[matId]; if (!c) return [];
+            const rows = [];
+            const moKeys = c.moKeys;
+
+            function moRow(b) {
+                const m = (b && b.mrp) || 1;
+                const rem1 = m - ((b&&b.std)||0) - ((b&&b.gen)||0);
+                const rem2 = rem1 - ((b&&b.early)||0);
+                const rem3 = rem2 - ((b&&b.sch)||0);
+                return { sales: b ? b.sales : 0,
+                    dP: b ? b.disc/m*100 : 0, sP: b ? b.std/m*100 : 0, gP: b ? b.gen/m*100 : 0,
+                    eP: b ? b.early/(rem1||1)*100 : 0, schP: b ? b.sch/(rem2||1)*100 : 0, mP: b ? b.mgmt/(rem3||1)*100 : 0 };
+            }
+
+            // Build header labels
+            const dimCols = c.dimLabels;
+
+            // Subtotal row first
+            const subRow = {};
+            dimCols.forEach((l, i) => subRow[l] = i === 0 ? 'SUBTOTAL' : '');
+
+            // Compute moTotals
+            const moTotals = {};
+            moKeys.forEach(mo => moTotals[mo] = {sales:0,mrp:0,disc:0,std:0,gen:0,early:0,sch:0,mgmt:0});
+            c.rows.forEach(row => {
+                moKeys.forEach(mo => {
+                    const b = (row.byMo||{})[mo]; if (!b) return;
+                    moTotals[mo].sales+=b.sales; moTotals[mo].mrp+=b.mrp; moTotals[mo].disc+=b.disc;
+                    moTotals[mo].std+=b.std; moTotals[mo].gen+=b.gen; moTotals[mo].early+=b.early;
+                    moTotals[mo].sch+=b.sch; moTotals[mo].mgmt+=b.mgmt;
+                });
+            });
+
+            moKeys.forEach(mo => {
+                const d = moRow(moTotals[mo]);
+                subRow[mo + ' Sales (L)']      = +(d.sales/100000).toFixed(2);
+                subRow[mo + ' Total Disc%']    = +d.dP.toFixed(2);
+                subRow[mo + ' Std%']           = +d.sP.toFixed(2);
+                subRow[mo + ' Gen%']           = +d.gP.toFixed(2);
+                subRow[mo + ' Early%']         = +d.eP.toFixed(2);
+                subRow[mo + ' Sch%']           = +d.schP.toFixed(2);
+                subRow[mo + ' Mgmt%']          = +d.mP.toFixed(2);
+            });
+            rows.push(subRow);
+
+            // Data rows
+            c.rows.forEach(row => {
+                const r = {};
+                const dimVals = c.dimFn(row);
+                dimCols.forEach((l, i) => r[l] = dimVals[i] || '');
+                moKeys.forEach(mo => {
+                    const d = moRow((row.byMo||{})[mo]);
+                    r[mo + ' Sales (L)']   = +(d.sales/100000).toFixed(2);
+                    r[mo + ' Total Disc%'] = +d.dP.toFixed(2);
+                    r[mo + ' Std%']        = +d.sP.toFixed(2);
+                    r[mo + ' Gen%']        = +d.gP.toFixed(2);
+                    r[mo + ' Early%']      = +d.eP.toFixed(2);
+                    r[mo + ' Sch%']        = +d.schP.toFixed(2);
+                    r[mo + ' Mgmt%']       = +d.mP.toFixed(2);
+                });
+                rows.push(r);
+            });
+            return rows;
+        }
+
+        const m1 = matrixToRows('gm1');
+        const m2 = matrixToRows('gm2');
+        const m3 = matrixToRows('gm3');
+
+        if (m1.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(m1), 'M1 ZM-RM-SubZone');
+        if (m2.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(m2), 'M2 ZM-Customer');
+        if (m3.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(m3), 'M3 SBU');
+
+        if (wb.SheetNames.length === 0) {
+            alert('No matrix data to export. Please load data first.');
+            return;
+        }
+        XLSX.writeFile(wb, 'Sales_Matrix_Export.xlsx');
+    }
+</script>
+</body>
+</html>
