@@ -1,58 +1,198 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-  <title>Login</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Ozone Portal</title>
 
 <style>
 
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:'Segoe UI',sans-serif;
+}
+
 body{
-  font-family:Arial;
-  background:#f4f4f4;
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+background:linear-gradient(135deg,#07162b,#0f2f5f,#2563eb);
+overflow:hidden;
+position:relative;
 }
 
-.login-box{
-  width:300px;
-  background:white;
-  padding:30px;
-  margin:100px auto;
-  border-radius:12px;
-  text-align:center;
-  box-shadow:0 0 10px rgba(0,0,0,0.1);
+/* Animated Background */
+
+body::before,
+body::after{
+content:'';
+position:absolute;
+width:500px;
+height:500px;
+border-radius:50%;
+background:rgba(255,255,255,0.08);
+filter:blur(50px);
+animation:float 8s infinite alternate ease-in-out;
 }
 
-input{
-  width:90%;
-  padding:10px;
-  margin:10px 0;
+body::before{
+top:-150px;
+left:-120px;
 }
+
+body::after{
+bottom:-150px;
+right:-120px;
+animation-delay:4s;
+}
+
+@keyframes float{
+from{
+transform:translateY(0px);
+}
+to{
+transform:translateY(40px);
+}
+}
+
+/* Login Card */
+
+.login-container{
+width:380px;
+padding:45px;
+border-radius:24px;
+background:rgba(255,255,255,0.12);
+backdrop-filter:blur(18px);
+border:1px solid rgba(255,255,255,0.15);
+box-shadow:0 8px 40px rgba(0,0,0,0.35);
+position:relative;
+z-index:2;
+text-align:center;
+color:white;
+}
+
+/* Logo */
+
+.logo{
+font-size:36px;
+font-weight:700;
+letter-spacing:1px;
+margin-bottom:8px;
+}
+
+.logo span{
+color:#93c5fd;
+}
+
+.subtitle{
+font-size:14px;
+opacity:0.8;
+margin-bottom:35px;
+}
+
+/* Input Fields */
+
+.input-group{
+margin-bottom:20px;
+}
+
+.input-group input{
+width:100%;
+padding:15px;
+border:none;
+outline:none;
+border-radius:12px;
+background:rgba(255,255,255,0.15);
+color:white;
+font-size:15px;
+transition:0.3s;
+}
+
+.input-group input::placeholder{
+color:#dbeafe;
+}
+
+.input-group input:focus{
+background:rgba(255,255,255,0.22);
+transform:scale(1.02);
+}
+
+/* Button */
 
 button{
-  padding:10px 20px;
-  background:#2563eb;
-  color:white;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
+width:100%;
+padding:15px;
+border:none;
+border-radius:12px;
+background:white;
+color:#1e3a8a;
+font-size:16px;
+font-weight:600;
+cursor:pointer;
+transition:0.3s;
+}
+
+button:hover{
+transform:translateY(-2px);
+box-shadow:0 8px 20px rgba(255,255,255,0.25);
+}
+
+/* Footer */
+
+.footer{
+margin-top:22px;
+font-size:12px;
+opacity:0.7;
+}
+
+/* Responsive */
+
+@media(max-width:450px){
+
+.login-container{
+width:90%;
+padding:35px 25px;
+}
+
+.logo{
+font-size:30px;
+}
+
 }
 
 </style>
-
 </head>
 
 <body>
 
-<div class="login-box">
+<div class="login-container">
 
-<h2>Company Login</h2>
+<div class="logo">
+Ozone <span>Portal</span>
+</div>
 
-<input type="text" id="username" placeholder="Username">
+<div class="subtitle">
+Secure Corporate Dashboard Access
+</div>
 
-<input type="password" id="password" placeholder="Password">
+<div class="input-group">
+<input type="text" id="username" placeholder="Enter Username">
+</div>
 
-<br><br>
+<div class="input-group">
+<input type="password" id="password" placeholder="Enter Password">
+</div>
 
 <button onclick="login()">Login</button>
+
+<div class="footer">
+© 2026 Ozone Corporate Portal
+</div>
 
 </div>
 
@@ -63,13 +203,24 @@ function login(){
 var user=document.getElementById("username").value;
 var pass=document.getElementById("password").value;
 
-if(user=="admin" && pass=="1234")
+if(user=="Ankit_Ozone" && pass=="Ankit@123")
 {
-  window.location.href="dashboard.html";
+window.location.href="dashboard.html";
 }
+
+else if(user=="Sagar_Ozone" && pass=="Sagar@123")
+{
+window.location.href="dashboard.html";
+}
+
+else if(user=="Abhishek_Ozone" && pass=="Abhishek@123")
+{
+window.location.href="dashboard.html";
+}
+
 else
 {
-   alert("Wrong Username or Password");
+alert("Invalid Username or Password");
 }
 
 }
